@@ -113,8 +113,8 @@ function findMatches()
     -- Function to locate all existing matches on the board
     local matches = {}
  
-    for i = 0, NUM_ROWS - 1 do
-        for j = 0, NUM_COLS - 1 do
+    for i = 0, NUM_COLS - 1 do
+        for j = 0, NUM_ROWS - 1 do
             local visited = {}
             local candy = board[i][j]
             if candy and not visited[candy] then
@@ -164,19 +164,19 @@ end
 function refillBoard()
     -- Fill the board with new candies if there are any empty spaces in a cascading manner
     local delay = .02
-    for i = NUM_ROWS - 1, 0, -1 do
-        for j = 0, NUM_COLS - 1 do
+    for i = NUM_COLS - 1, 0, -1 do
+        for j = 0, NUM_ROWS - 1 do
             local candy = board[i][j]
             if candy == nil then
                 local fall_height = 1
 
-                while i - fall_height >= 0 and board[i - fall_height][j] == nil do
+                while j - fall_height >= 0 and board[i][j - fall_height] == nil do
                     fall_height = fall_height + 1
                 end
 
-                if i - fall_height > 0 then
-                    board[i][j] = board[i - fall_height][j]
-                    board[i - fall_height][j] = nil
+                if j - fall_height > 0 then
+                    board[i][j] = board[i][j - fall_height]
+                    board[i][j - fall_height] = nil
                     updatePositions()
                 else
                     board[i][j] = createCandy(i, j)
@@ -197,7 +197,7 @@ function love.mousepressed(x, y, button, istouch)
         printcol = col
         printrow = row
 
-        local candy = board[row][col]
+        local candy = board[col][row]
 
         if candy then
             selected_candy1 = candy
@@ -213,7 +213,7 @@ function love.mousereleased(x, y, button)
         local col = math.floor(x / 64) + 1
         local row = math.floor(y / 64) + 1
 
-        local candy = board[row][col]
+        local candy = board[col][row]
 
         if candy then
             selected_candy2 = candy
@@ -227,9 +227,9 @@ end
 function setupBoard()
     -- Initialize the board with random candies
     local board = {}
-    for i = 0, NUM_ROWS - 1 do
+    for i = 0, NUM_COLS - 1 do
         board[i] = {}
-        for j = 0, NUM_COLS - 1 do
+        for j = 0, NUM_ROWS - 1 do
             board[i][j] = createCandy(i, j)
         end
     end
@@ -239,8 +239,8 @@ end
 
 function updatePositions()
     -- Helper function that ensures all candy object positional values match board position
-    for i = 0, NUM_ROWS - 1 do
-        for j = 0, NUM_COLS - 1 do
+    for i = 0, NUM_COLS - 1 do
+        for j = 0, NUM_ROWS - 1 do
             local candy = board[i][j]
             if candy ~= nil then
                 candy.x = i
@@ -272,15 +272,13 @@ function love.load()
     --vars used for debugging purposes
     last_pressed1 = nil
     last_pressed2 = nil
-
-
 end
 
 function love.draw()
     love.graphics.setBackgroundColor(200, 200, 200)
     if not win then
-        for i = 0, NUM_ROWS - 1 do
-            for j = 0, NUM_COLS - 1 do
+        for i = 0, NUM_COLS - 1 do
+            for j = 0, NUM_ROWS - 1 do
                 local candy = board[i][j]
                 if candy then
                     local color = { 255, 0, 0, 255 }  -- Default to red color
@@ -295,11 +293,11 @@ function love.draw()
                     end
 
                     love.graphics.setColor(color)
-                    love.graphics.rectangle("fill", (j - 1) * 64, (i - 1) * 64, 60, 60)
+                    love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
                 else
                     color = {0, 0, 0, 255}
                     love.graphics.setColor(color)
-                    love.graphics.rectangle("fill", (j - 1) * 64, (i - 1) * 64, 60, 60)
+                    love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
                 end
             end
         end
