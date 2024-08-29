@@ -21,6 +21,7 @@ local win_cond = 100
 
 timer = {}
 timer[0] = 0
+timer[1] = 0
 
 board = {}
 
@@ -152,10 +153,13 @@ end
 
 function removeMatches(matches)
     -- Remove candies from the board based on the given matches
-    for _, matched_set in ipairs(matches) do
-        for _, candy in ipairs(matched_set) do
-            board[candy.x][candy.y] = nil
+    if timer[1] > .4 then
+        for _, matched_set in ipairs(matches) do
+            for _, candy in ipairs(matched_set) do
+                board[candy.x][candy.y] = nil
+            end
         end
+        timer[1] = 0
     end
 end
 
@@ -336,7 +340,7 @@ end
 
 function refillBoard()
     -- searches for empty cells and refills them
-    if timer[0] > .1 then
+    if timer[0] > .2 then
         for row = NUM_ROWS - 1, 0, -1 do
             local nil_cells = checkRow(row)
             local cells_to_fall = {}
@@ -394,6 +398,7 @@ end
 function checkForAction()
     -- Checks to see if 2 valid candies are selected by the player, and updates board
     if selected_candy1 and selected_candy2 and areAdjacent(selected_candy1, selected_candy2) and moves_left > 0 then
+        timer[1] = 1 -- reset timer[1] to 1 for better responsiveness on matching
         swapCandy(selected_candy1, selected_candy2)
         updatePositions()
 
@@ -410,6 +415,7 @@ end
 
 function love.update(dt)
     timer[0] = timer[0] + dt
+    timer[1] = timer[1] + dt
     local matches = findMatches()
     removeMatches(matches)
     refillBoard()
