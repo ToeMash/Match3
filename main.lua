@@ -19,6 +19,9 @@ local mult = 1
 local win = false
 local win_cond = 100
 
+timer = {}
+timer[0] = 0
+
 board = {}
 
 -- two variables to track selected candies
@@ -36,8 +39,6 @@ function createCandy(i, j, t)
     return { type = type_t, x = i, y = j }
 end
 
-
-
 function areAdjacent(c1, c2)
     -- Check if two candies are adjacent
     if c1 and c2 then
@@ -51,7 +52,6 @@ function areAdjacent(c1, c2)
     end
     return false
 end
-
 
 function isMatch(c1, c2)
     -- Check if two candies are matching in type
@@ -150,39 +150,11 @@ function findConnectedMatches(candy, visited)
     return matched_neighbors
 end
 
-
 function removeMatches(matches)
     -- Remove candies from the board based on the given matches
     for _, matched_set in ipairs(matches) do
         for _, candy in ipairs(matched_set) do
             board[candy.x][candy.y] = nil
-        end
-    end
-end
-
-
-function refillBoard()
-    -- Fill the board with new candies if there are any empty spaces in a cascading manner
-    local delay = .02
-    for i = NUM_COLS - 1, 0, -1 do
-        for j = 0, NUM_ROWS - 1 do
-            local candy = board[i][j]
-            if candy == nil then
-                local fall_height = 1
-
-                while j - fall_height >= 0 and board[i][j - fall_height] == nil do
-                    fall_height = fall_height + 1
-                end
-
-                if j - fall_height > 0 then
-                    board[i][j] = board[i][j - fall_height]
-                    board[i][j - fall_height] = nil
-                    updatePositions()
-                else
-                    board[i][j] = createCandy(i, j)
-                end
-                love.timer.sleep(delay)
-            end
         end
     end
 end
@@ -326,11 +298,101 @@ function updateScore(matches)
     end
 end
 
-function love.update(dt)
-    local matches = findMatches()
-    removeMatches(matches)
-    refillBoard()
-    updateScore(matches, mult)
+function checkRow(row)
+    -- Check a passed in row for nil cells and return them as an array
+    local nil_cells = {}
+    for i = NUM_COLS - 1, 0, -1 do
+        local candy = board[i][row]
+        if candy == nil then
+            local cell = {x = i, y = row}
+            table.insert(nil_cells, cell)
+        end
+    end
+
+    return nil_cells
+end
+
+function findCandyToFall(cell)
+    -- Determines which candy will fall into the passed in cell, if none, create a new candy
+    local i = cell["x"]
+    local j = cell["y"]
+    local fall_height = 1
+    local cell_pair = {destination = cell, source = nil}
+    while j - fall_height > 0 and board[i][j - fall_height] == nil do
+        fall_height = fall_height + 1
+    end
+
+    local candy_to_fall = nil
+    if j - fall_height > 0 then
+        candy_to_fall = board[i][j - fall_height]
+    else
+        board[i][0] = createCandy(i, 0)
+        candy_to_fall = board[i][0]
+    end
+    updatePositions()
+    cell_pair["source"] = candy_to_fall
+    return cell_pair
+end
+
+function refillBoard()
+    -- searches for empty cells and refills them
+    if timer[0] > .1 then
+        for row = NUM_ROWS - 1, 0, -1 do
+            local nil_cells = checkRow(row)
+            local cells_to_fall = {}
+            for _, cell in ipairs(nil_cells) do
+                table.insert(cells_to_fall, findCandyToFall(cell))
+            end
+            cells_to_fall = cascade(cells_to_fall)
+            nil_cells = checkRow(row)
+
+            if #nil_cells > 0 then
+                row = row + 1
+            end
+        end
+
+        timer[0] = 0
+    end
+end
+
+function slowDescent(cell_pair)
+    -- Helper function which causes a candy to descend 1 space at a time, returns 0 if the candy is already at the bottom, 1 otherwise
+    local x = cell_pair["destination"]["x"]
+    local dest_y = cell_pair["destination"]["y"]
+    local src_y = cell_pair["source"]["y"]
+    if src_y + 1 >= NUM_ROWS - 1 or src_y < dest_y then
+        board[x][src_y + 1] = cell_pair["source"]
+        board[x][src_y] = nil
+        updatePositions()
+        return 1
+    end
+    return 0
+end
+
+function cascade(cells_to_fall)
+    -- Takes an array of cell_pairs which contain dst and src cells and moves each src cell closer to its dst by 1
+    local indices_to_remove = {}
+    for i, cell_pair in ipairs(cells_to_fall) do
+        if slowDescent(cell_pair) == 1 then
+            cell_pair["source"] = {x = cell_pair["source"]["x"], y = cell_pair["source"]["y"] + 1}
+            cells_to_fall[i] = cell_pair -- may be unnecessary?
+        else
+            table.insert(indices_to_remove, 0, i)
+        end
+    end
+
+    for _, index in ipairs(indices_to_remove) do
+        table.remove(cells_to_fall, index)
+    end
+    return cells_to_fall
+end
+
+function love.conf(t)
+	t.console = true
+end
+
+function checkForAction()
+    -- Checks to see if 2 valid candies are selected by the player, and updates board
     if selected_candy1 and selected_candy2 and areAdjacent(selected_candy1, selected_candy2) and moves_left > 0 then
         swapCandy(selected_candy1, selected_candy2)
         updatePositions()
@@ -344,6 +406,17 @@ function love.update(dt)
         moves_left = moves_left - 1
         
     end
+end
+
+function love.update(dt)
+    timer[0] = timer[0] + dt
+    local matches = findMatches()
+    removeMatches(matches)
+    refillBoard()
+    updateScore(matches, mult)
+
+    checkForAction()
+    
     if win then
         love.timer.sleep(3)
         love.event.quit("restart")
