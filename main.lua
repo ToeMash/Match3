@@ -1,3 +1,9 @@
+local socket = require "socket"
+local address, port = "localhost", 12345
+
+local entity
+local updaterate = 0.1
+
 local game = {}
 
 -- Constants for candy types
@@ -9,6 +15,15 @@ local CANDY_TYPES = {
     ["purple"] = 5,
 }
 
+menu_buttons = {
+    [1] = {text = "Welcome To Match3" ,x = 0, y = 10, color = {0, 255, 0, 255}},
+    [2] = {text = "Single Player", x = 0, y = 30, color = {255, 0, 255, 255}},
+    [3] = {text ="Mult Player", x = 0, y = 50, color = {0, 0, 255, 255}},
+}
+
+BUTTON_WIDTH = 120
+BUTTON_HEIGHT = 15
+
 local NUM_ROWS = 6
 local NUM_COLS = 7
 
@@ -19,6 +34,11 @@ local mult = 1
 local win = false
 local win_cond = 100
 
+local title = "Match3"
+
+state = "menu"
+selection = nil
+
 timer = {}
 timer[0] = 0
 timer[1] = 0
@@ -28,6 +48,8 @@ board = {}
 -- two variables to track selected candies
 selected_candy1 = nil
 selected_candy2 = nil
+
+m_pos = {x = nil, y = nil}
 
 function createCandy(i, j, t)
     -- Create a new candy with optional type t
@@ -164,22 +186,29 @@ function removeMatches(matches)
 end
 
 function love.mousepressed(x, y, button, istouch)
-    -- Convert mouse coordinates to board indices
-    if button == 1 then
-        local col = math.floor(x / 64) + 1
-        local row = math.floor(y / 64) + 1
-        printx = x
-        printy = y
-        printcol = col
-        printrow = row
+    if state == "game" then
+        -- Convert mouse coordinates to board indices
+        if button == 1 then
+            local col = math.floor(x / 64) + 1
+            local row = math.floor(y / 64) + 1
+            printx = x
+            printy = y
+            printcol = col
+            printrow = row
 
-        local candy = board[col][row]
+            local candy = board[col][row]
 
-        if candy then
-            selected_candy1 = candy
-        else
-            selected_candy1 = nil
-            selected_candy2 = nil
+            if candy then
+                selected_candy1 = candy
+            else
+                selected_candy1 = nil
+                selected_candy2 = nil
+            end
+        end
+    elseif state == "menu" then
+        if button == 1 then
+            m_pos["x"] = x
+            m_pos["y"] = y
         end
     end
 end
@@ -248,49 +277,54 @@ function love.load()
     --vars used for debugging purposes
     last_pressed1 = nil
     last_pressed2 = nil
+
+    love.window.setTitle(title .. " - " .. state)
 end
 
 function love.draw()
-    love.graphics.setBackgroundColor(200, 200, 200)
-    if not win then
-        for i = 0, NUM_COLS - 1 do
-            for j = 0, NUM_ROWS - 1 do
-                local candy = board[i][j]
-                if candy then
-                    local color = { 255, 0, 0, 255 }  -- Default to red color
-                    if candy.type == "yellow" then
-                        color = { 255, 255, 0, 255 }
-                    elseif candy.type == "green" then
-                        color = { 0, 255, 0, 255 }
-                    elseif candy.type == "blue" then
-                        color = { 0, 0, 255, 255 }
-                    elseif candy.type == "purple" then
-                        color = { 255, 0, 255, 255 }
-                    end
+    if state == "game" then
+        love.graphics.setBackgroundColor(200, 200, 200)
+        if not win then
+            for i = 0, NUM_COLS - 1 do
+                for j = 0, NUM_ROWS - 1 do
+                    local candy = board[i][j]
+                    if candy then
+                        local color = { 255, 0, 0, 255 }
+                        if candy.type == "yellow" then
+                            color = { 255, 255, 0, 255 }
+                        elseif candy.type == "green" then
+                            color = { 0, 255, 0, 255 }
+                        elseif candy.type == "blue" then
+                            color = { 0, 0, 255, 255 }
+                        elseif candy.type == "purple" then
+                            color = { 255, 0, 255, 255 }
+                        end
 
-                    love.graphics.setColor(color)
-                    love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
-                else
-                    color = {0, 0, 0, 255}
-                    love.graphics.setColor(color)
-                    love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
+                        love.graphics.setColor(color)
+                        love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
+                    else
+                        color = {0, 0, 0, 255}
+                        love.graphics.setColor(color)
+                        love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
+                    end
                 end
             end
+            love.graphics.setColor(0, 0, 0, 255)
+            love.graphics.print("Score: " .. score, 400, 10)
+            love.graphics.print("Moves Left: " .. moves_left, 400, 30)
+            love.graphics.print("Multiplier: " .. mult, 400, 50)
+        else
+            love.graphics.print("YOU WON!", 10, 50)
         end
-        love.graphics.setColor(0, 0, 0, 255)
-        --if last_pressed1 == nil or last_pressed2 == nil then
-        --    love.graphics.print(string.format("%s,%s", last_pressed1, last_pressed2), printx, printy)
-        --else
-        --    love.graphics.print(string.format("%s,%s", last_pressed1.type, last_pressed2.type), printx, printy)
-        --end
 
-        love.graphics.setColor(0, 0, 0, 255)  -- Use a different color for scores maybe
-        love.graphics.print("Score: " .. score, 400, 10)
-        love.graphics.print("Moves Left: " .. moves_left, 400, 30)
-        love.graphics.print("Multiplier: " .. mult, 400, 50)
-    
-    else
-        love.graphics.print("YOU WON!: ", 10, 50)
+    elseif state == "menu" then
+        love.graphics.setBackgroundColor(200, 200, 200)
+        for _, button in ipairs(menu_buttons) do
+            love.graphics.setColor(button["color"])
+            love.graphics.rectangle("fill", button["x"], button["y"], BUTTON_WIDTH, BUTTON_HEIGHT)
+            love.graphics.setColor(0, 0, 0, 255)
+            love.graphics.print(button["text"], button["x"], button["y"])
+        end
     end
 end
 
@@ -413,23 +447,41 @@ function checkForAction()
     end
 end
 
-function love.update(dt)
-    timer[0] = timer[0] + dt
-    timer[1] = timer[1] + dt
-    local matches = findMatches()
-    removeMatches(matches)
-    refillBoard()
-    updateScore(matches, mult)
-
-    checkForAction()
-    
-    if win then
-        love.timer.sleep(3)
-        love.event.quit("restart")
+function menuClick()
+    if m_pos["x"] and m_pos["y"] then
+        for _, button in ipairs(menu_buttons) do
+            if button["x"] <= m_pos["x"] and button["x"] + BUTTON_WIDTH >= m_pos["x"] and button["y"] <= m_pos["y"] and button["y"] + BUTTON_HEIGHT >= m_pos["y"] then
+                selection = button["text"]
+            end
+        end
     end
-    if moves_left == 0 then
-        if score > win_cond then
-            win = true
+end
+
+function love.update(dt)
+    if state == "game" then
+        timer[0] = timer[0] + dt
+        timer[1] = timer[1] + dt
+        local matches = findMatches()
+        removeMatches(matches)
+        refillBoard()
+        updateScore(matches, mult)
+
+        checkForAction()
+        
+        if win then
+            love.timer.sleep(3)
+            love.event.quit("restart")
+        end
+        if moves_left == 0 then
+            if score > win_cond then
+                win = true
+            end
+        end
+    elseif state == "menu" then
+        menuClick()
+        if selection == "Single Player" then
+            state = "game"
+            love.window.setTitle(title .. " - " .. state)
         end
     end
 end
