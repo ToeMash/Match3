@@ -4,6 +4,12 @@ local address, port = "localhost", 12345
 local entity
 local updaterate = 0.1
 
+function love.load()
+    udp = socket.udp()
+    udp:settimeout(0)
+    udp:setpeername(address, port)
+end
+
 local game = {}
 
 -- Constants for candy types
@@ -50,6 +56,7 @@ selected_candy1 = nil
 selected_candy2 = nil
 
 m_pos = {x = nil, y = nil}
+mouse_position = {x = nil, y = nil}
 
 function createCandy(i, j, t)
     -- Create a new candy with optional type t
@@ -185,18 +192,18 @@ function removeMatches(matches)
     end
 end
 
+function getCandyFromPos(x, y)
+    local col = math.floor(x / 64) + 1
+    local row = math.floor(y / 64) + 1
+    local candy = board[col][row]
+    return candy
+end
+
 function love.mousepressed(x, y, button, istouch)
     if state == "game" then
         -- Convert mouse coordinates to board indices
         if button == 1 then
-            local col = math.floor(x / 64) + 1
-            local row = math.floor(y / 64) + 1
-            printx = x
-            printy = y
-            printcol = col
-            printrow = row
-
-            local candy = board[col][row]
+            local candy = getCandyFromPos(x, y)
 
             if candy then
                 selected_candy1 = candy
@@ -215,16 +222,15 @@ end
 
 function love.mousereleased(x, y, button)
     if button == 1 then
-        local col = math.floor(x / 64) + 1
-        local row = math.floor(y / 64) + 1
+        if selected_candy1 then
+            local candy = getHoveredCandy()
 
-        local candy = board[col][row]
-
-        if candy then
-            selected_candy2 = candy
-        else
-            selected_candy2 = nil
-            selected_candy1 = nil
+            if candy then
+                selected_candy2 = candy
+            else
+                selected_candy2 = nil
+                selected_candy1 = nil
+            end
         end
     end
 end
@@ -281,6 +287,44 @@ function love.load()
     love.window.setTitle(title .. " - " .. state)
 end
 
+color_dict = {
+    yellow = { 255, 255, 0, 255 },
+    green = { 0, 255, 0, 255 },
+    blue = { 0, 0, 255, 255 },
+    purple = { 255, 0, 255, 255 },
+    red = { 255, 0, 0, 255 }
+}
+
+function getColor(candy)
+    return color_dict[candy.type]
+end
+
+function getHoveredCandy()
+    local mx = mouse_position['x']
+    local my = mouse_position['y']
+    local cx = (selected_candy1['x'] - 1) * 64 + 32
+    local cy = (selected_candy1['y'] - 1) * 64 + 32
+
+    local x_diff = cx - mx
+    local y_diff = cy - my
+
+    local hovered_candy = nil
+    if math.abs(x_diff) > math.abs(y_diff) then
+        if x_diff > 0 then
+            hovered_candy = getCandyFromPos(cx - 64, cy)
+        elseif x_diff < 0 then
+            hovered_candy = getCandyFromPos(cx + 64, cy)
+        end
+    elseif math.abs(x_diff) < math.abs(y_diff) then
+        if y_diff > 0 then
+            hovered_candy = getCandyFromPos(cx, cy - 64)
+        elseif x_diff < 0 then
+            hovered_candy = getCandyFromPos(cx, cy + 64)
+        end
+    end
+    return hovered_candy
+end
+
 function love.draw()
     if state == "game" then
         love.graphics.setBackgroundColor(200, 200, 200)
@@ -289,15 +333,9 @@ function love.draw()
                 for j = 0, NUM_ROWS - 1 do
                     local candy = board[i][j]
                     if candy then
-                        local color = { 255, 0, 0, 255 }
-                        if candy.type == "yellow" then
-                            color = { 255, 255, 0, 255 }
-                        elseif candy.type == "green" then
-                            color = { 0, 255, 0, 255 }
-                        elseif candy.type == "blue" then
-                            color = { 0, 0, 255, 255 }
-                        elseif candy.type == "purple" then
-                            color = { 255, 0, 255, 255 }
+                        local color = getColor(candy)
+                        if candy == selected_candy1 then
+                            color = {0, 0, 0, 255}
                         end
 
                         love.graphics.setColor(color)
@@ -313,6 +351,33 @@ function love.draw()
             love.graphics.print("Score: " .. score, 400, 10)
             love.graphics.print("Moves Left: " .. moves_left, 400, 30)
             love.graphics.print("Multiplier: " .. mult, 400, 50)
+
+            if selected_candy1 then
+                local border_radius = 3
+                local border_width = 3
+                
+                local hovered_candy = getHoveredCandy()
+                if hovered_candy then
+                    love.graphics.setLineWidth(border_width)
+                    love.graphics.setColor(getColor(selected_candy1))
+                    love.graphics.rectangle("fill", (hovered_candy['x'] - 1) * 64, (hovered_candy['y'] - 1) * 64, 60, 60)
+                    love.graphics.setColor(0, 0, 0, 255)
+                    love.graphics.rectangle("line", (hovered_candy['x'] - 1) * 64, (hovered_candy['y'] - 1) * 64, 60, 60)
+                    love.graphics.setColor(getColor(hovered_candy))
+                    love.graphics.rectangle("fill", (selected_candy1['x'] - 1) * 64, (selected_candy1['y'] - 1) * 64, 60, 60)
+                    
+                    love.graphics.setColor(0, 0, 0, 255)
+                    love.graphics.rectangle("line", (selected_candy1['x'] - 1) * 64, (selected_candy1['y'] - 1) * 64, 60, 60)
+                end
+
+                local color = getColor(selected_candy1)
+                love.graphics.setColor(color)
+                love.graphics.rectangle("fill", mouse_position['x'] - 32, mouse_position['y'] - 32, 60, 60, border_radius, border_radius)
+                love.graphics.setLineWidth(border_width)
+                love.graphics.setColor(0, 0, 0, 255)
+                love.graphics.rectangle("line", mouse_position['x'] - 32, mouse_position['y'] - 32, 60, 60, border_radius, border_radius)
+            end
+
         else
             love.graphics.print("YOU WON!", 10, 50)
         end
@@ -467,6 +532,8 @@ function love.update(dt)
         updateScore(matches, mult)
 
         checkForAction()
+
+        mouse_position['x'], mouse_position['y'] = love.mouse.getPosition()
         
         if win then
             love.timer.sleep(3)
