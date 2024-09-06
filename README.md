@@ -9,6 +9,6 @@ Match-3 style game built in Love2d
 - Score with Combo Multipliers
 
 	
-Logo: ![Alt](/Menu.png "Menu")
-Logo: ![Alt](/InGame.png "In Game")
-Logo: ![Alt](/gameplay.gif "Gameplay with visual effects")
+Menu: ![Alt](/Menu.PNG "Menu")
+In Game: ![Alt](/InGame.PNG "In Game")
+Gameplay with visual effects: ![Alt](/gameplay.gif "Gameplay with visual effects")
