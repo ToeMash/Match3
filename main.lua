@@ -318,7 +318,7 @@ function getHoveredCandy()
     elseif math.abs(x_diff) < math.abs(y_diff) then
         if y_diff > 0 then
             hovered_candy = getCandyFromPos(cx, cy - 64)
-        elseif x_diff < 0 then
+        elseif y_diff < 0 then
             hovered_candy = getCandyFromPos(cx, cy + 64)
         end
     end
@@ -370,12 +370,7 @@ function love.draw()
                     love.graphics.rectangle("line", (selected_candy1['x'] - 1) * 64, (selected_candy1['y'] - 1) * 64, 60, 60)
                 end
 
-                local color = getColor(selected_candy1)
-                love.graphics.setColor(color)
-                love.graphics.rectangle("fill", mouse_position['x'] - 32, mouse_position['y'] - 32, 60, 60, border_radius, border_radius)
-                love.graphics.setLineWidth(border_width)
-                love.graphics.setColor(0, 0, 0, 255)
-                love.graphics.rectangle("line", mouse_position['x'] - 32, mouse_position['y'] - 32, 60, 60, border_radius, border_radius)
+                
             end
 
         else
