@@ -4,10 +4,10 @@ local address, port = "localhost", 12345
 local entity
 local updaterate = 0.1
 
-function love.load()
-    udp = socket.udp()
-    udp:settimeout(0)
-    udp:setpeername(address, port)
+tcp = nil
+
+if state == "multiplayer" then
+    tcp = socket.tcp()
 end
 
 local game = {}
@@ -24,7 +24,13 @@ local CANDY_TYPES = {
 menu_buttons = {
     [1] = {text = "Welcome To Match3" ,x = 0, y = 10, color = {0, 255, 0, 255}},
     [2] = {text = "Single Player", x = 0, y = 30, color = {255, 0, 255, 255}},
-    [3] = {text ="Mult Player", x = 0, y = 50, color = {0, 0, 255, 255}},
+    [3] = {text ="Multi Player", x = 0, y = 50, color = {0, 0, 255, 255}},
+}
+
+multi_menu_buttons = {
+    [1] = {text = "Host Game" ,x = 0, y = 10, color = {0, 255, 0, 255}},
+    [2] = {text = "Join Game", x = 0, y = 30, color = {255, 0, 255, 255}},
+    [3] = {text = "Back", x = 0, y = 50, color = {0, 0, 255, 255}},
 }
 
 BUTTON_WIDTH = 120
@@ -57,6 +63,22 @@ selected_candy2 = nil
 
 m_pos = {x = nil, y = nil}
 mouse_position = {x = nil, y = nil}
+
+function multiplayerHost()
+    if tcp.bind(address, port) == 1 then  -- maybe use (*, 0)
+        if tcp.listen(1) == 1 then
+            client = tcp.accept()
+            -- we have connected to a client
+        end
+    end
+end
+
+function multiplayerClient()
+    if tcp.connect(address, port) == 1 then -- this address/port should be the host's Right??
+        -- we have connected to host
+    end
+end
+
 
 function createCandy(i, j, t)
     -- Create a new candy with optional type t
@@ -212,7 +234,7 @@ function love.mousepressed(x, y, button, istouch)
                 selected_candy2 = nil
             end
         end
-    elseif state == "menu" then
+    else
         if button == 1 then
             m_pos["x"] = x
             m_pos["y"] = y
@@ -329,62 +351,68 @@ function love.draw()
     if state == "game" then
         love.graphics.setBackgroundColor(200, 200, 200)
         if not win then
-            for i = 0, NUM_COLS - 1 do
-                for j = 0, NUM_ROWS - 1 do
-                    local candy = board[i][j]
-                    if candy then
-                        local color = getColor(candy)
-                        if candy == selected_candy1 then
-                            color = {0, 0, 0, 255}
-                        end
-
-                        love.graphics.setColor(color)
-                        love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
-                    else
-                        color = {0, 0, 0, 255}
-                        love.graphics.setColor(color)
-                        love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
-                    end
-                end
-            end
-            love.graphics.setColor(0, 0, 0, 255)
-            love.graphics.print("Score: " .. score, 400, 10)
-            love.graphics.print("Moves Left: " .. moves_left, 400, 30)
-            love.graphics.print("Multiplier: " .. mult, 400, 50)
-
-            if selected_candy1 then
-                local border_radius = 3
-                local border_width = 3
-                
-                local hovered_candy = getHoveredCandy()
-                if hovered_candy then
-                    love.graphics.setLineWidth(border_width)
-                    love.graphics.setColor(getColor(selected_candy1))
-                    love.graphics.rectangle("fill", (hovered_candy['x'] - 1) * 64, (hovered_candy['y'] - 1) * 64, 60, 60)
-                    love.graphics.setColor(0, 0, 0, 255)
-                    love.graphics.rectangle("line", (hovered_candy['x'] - 1) * 64, (hovered_candy['y'] - 1) * 64, 60, 60)
-                    love.graphics.setColor(getColor(hovered_candy))
-                    love.graphics.rectangle("fill", (selected_candy1['x'] - 1) * 64, (selected_candy1['y'] - 1) * 64, 60, 60)
-                    
-                    love.graphics.setColor(0, 0, 0, 255)
-                    love.graphics.rectangle("line", (selected_candy1['x'] - 1) * 64, (selected_candy1['y'] - 1) * 64, 60, 60)
-                end
-
-                
-            end
-
+            doMainGame()
         else
             love.graphics.print("YOU WON!", 10, 50)
         end
-
     elseif state == "menu" then
-        love.graphics.setBackgroundColor(200, 200, 200)
-        for _, button in ipairs(menu_buttons) do
-            love.graphics.setColor(button["color"])
-            love.graphics.rectangle("fill", button["x"], button["y"], BUTTON_WIDTH, BUTTON_HEIGHT)
-            love.graphics.setColor(0, 0, 0, 255)
-            love.graphics.print(button["text"], button["x"], button["y"])
+        doMenu(menu_buttons)
+    elseif state == "multimenu" then
+        doMenu(multi_menu_buttons)
+    end
+end
+
+function doMainGame()
+    for i = 0, NUM_COLS - 1 do
+        for j = 0, NUM_ROWS - 1 do
+            local candy = board[i][j]
+            if candy then
+                local color = getColor(candy)
+                if candy == selected_candy1 then
+                    color = {0, 0, 0, 255}
+                end
+
+                love.graphics.setColor(color)
+                love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
+            else
+                color = {0, 0, 0, 255}
+                love.graphics.setColor(color)
+                love.graphics.rectangle("fill", (i - 1) * 64, (j - 1) * 64, 60, 60)
+            end
         end
+    end
+    love.graphics.setColor(0, 0, 0, 255)
+    love.graphics.print("Score: " .. score, 400, 10)
+    love.graphics.print("Moves Left: " .. moves_left, 400, 30)
+    love.graphics.print("Multiplier: " .. mult, 400, 50)
+
+    if selected_candy1 then
+        local border_radius = 3
+        local border_width = 3
+        
+        local hovered_candy = getHoveredCandy()
+        if hovered_candy then
+            love.graphics.setLineWidth(border_width)
+            love.graphics.setColor(getColor(selected_candy1))
+            love.graphics.rectangle("fill", (hovered_candy['x'] - 1) * 64, (hovered_candy['y'] - 1) * 64, 60, 60)
+            love.graphics.setColor(0, 0, 0, 255)
+            love.graphics.rectangle("line", (hovered_candy['x'] - 1) * 64, (hovered_candy['y'] - 1) * 64, 60, 60)
+            love.graphics.setColor(getColor(hovered_candy))
+            love.graphics.rectangle("fill", (selected_candy1['x'] - 1) * 64, (selected_candy1['y'] - 1) * 64, 60, 60)
+            
+            love.graphics.setColor(0, 0, 0, 255)
+            love.graphics.rectangle("line", (selected_candy1['x'] - 1) * 64, (selected_candy1['y'] - 1) * 64, 60, 60)
+        end
+    end
+end
+
+function doMenu(buttons)
+    love.graphics.setBackgroundColor(200, 200, 200)
+    for _, button in ipairs(buttons) do
+        love.graphics.setColor(button["color"])
+        love.graphics.rectangle("fill", button["x"], button["y"], BUTTON_WIDTH, BUTTON_HEIGHT)
+        love.graphics.setColor(0, 0, 0, 255)
+        love.graphics.print(button["text"], button["x"], button["y"])
     end
 end
 
@@ -507,11 +535,13 @@ function checkForAction()
     end
 end
 
-function menuClick()
+function menuClick(buttons)
     if m_pos["x"] and m_pos["y"] then
-        for _, button in ipairs(menu_buttons) do
+        for _, button in ipairs(buttons) do
             if button["x"] <= m_pos["x"] and button["x"] + BUTTON_WIDTH >= m_pos["x"] and button["y"] <= m_pos["y"] and button["y"] + BUTTON_HEIGHT >= m_pos["y"] then
                 selection = button["text"]
+                m_pos['x'] = nil
+                m_pos['y'] = nil
             end
         end
     end
@@ -540,9 +570,26 @@ function love.update(dt)
             end
         end
     elseif state == "menu" then
-        menuClick()
+        menuClick(menu_buttons)
         if selection == "Single Player" then
             state = "game"
+            love.window.setTitle(title .. " - " .. state)
+        elseif selection == "Multi Player" then
+            state = "multimenu"
+            love.window.setTitle(title .. " - " .. state)
+        end
+    elseif state == "multimenu" then
+        menuClick(multi_menu_buttons)
+        if selection == "Host Game" then
+            state = "waiting for host"
+            love.window.setTitle(title .. " - " .. state)
+            multiplayerHost()
+        elseif selection == "Join Game" then
+            state = "joining game"
+            love.window.setTitle(title .. " - " .. state)
+            multiplayerClient()
+        elseif selection == "Back" then
+            state = "menu"
             love.window.setTitle(title .. " - " .. state)
         end
     end
